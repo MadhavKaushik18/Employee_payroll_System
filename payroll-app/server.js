@@ -1,95 +1,71 @@
-const express = require('express');
-const app = express();
-const fileHandler = require('./modules/fileHandler');
+const express = require("express")
+const path = require("path")
+const fileHandler = require("./modules/filehandler")
 
-app.use(express.urlencoded({ extended: true }));
-app.use(express.static('public'));
-app.set('view engine', 'ejs');
+const app = express()
+const PORT = 4000
 
+app.use(express.urlencoded({ extended: true }))
+app.use(express.static("public"))
+app.set("view engine", "ejs")
 
-// HOME ROUTE (Dashboard)
-app.get('/', async (req, res) => {
-    const employees = await fileHandler.read();
-    res.render('index', { employees });
-});
+app.get("/", async (req, res) => {
+    console.log("Hellow")
+    const employees = await fileHandler.read()
+    console.log("employees", employees)
+    res.render("index", { employees })
+})
 
+app.get("/add", (req, res) => {
+    res.render("add")
+})
 
-// SHOW ADD FORM
-app.get('/add', (req, res) => {
-    res.render('add');
-});
-
-
-// ADD EMPLOYEE
-app.post('/add', async (req, res) => {
-    const { name, department, salary } = req.body;
-
-    if (!name || salary < 0) {
-        return res.send("Invalid Data!");
+app.post("/add", async (req, res) => {
+    const { name, department, salary } = req.body
+    if (!name || !department || Number(salary) < 0) {
+        return res.redirect("/")
     }
-
-    const employees = await fileHandler.read();
-
-    const newEmployee = {
+    const employees = await fileHandler.read()
+    employees.push({
         id: Date.now(),
         name,
         department,
         salary: Number(salary)
-    };
+    })
+    await fileHandler.write(employees)
+    res.redirect("/")
+})
 
-    employees.push(newEmployee);
-    await fileHandler.write(employees);
+app.get("/delete/:id", async (req, res) => {
+    const employees = await fileHandler.read()
+    const updated = employees.filter(e => e.id != req.params.id)
+    await fileHandler.write(updated)
+    res.redirect("/")
+})
 
-    res.redirect('/');
-});
+app.get("/edit/:id", async (req, res) => {
+    const employees = await fileHandler.read()
+    const employee = employees.find(e => e.id == req.params.id)
+    res.render("edit", { employee })
+})
 
-
-// DELETE EMPLOYEE
-app.get('/delete/:id', async (req, res) => {
-    const id = Number(req.params.id);
-    let employees = await fileHandler.read();
-
-    employees = employees.filter(emp => emp.id !== id);
-
-    await fileHandler.write(employees);
-    res.redirect('/');
-});
-
-
-// SHOW EDIT FORM
-app.get('/edit/:id', async (req, res) => {
-    const id = Number(req.params.id);
-    const employees = await fileHandler.read();
-
-    const employee = employees.find(emp => emp.id === id);
-
-    res.render('edit', { employee });
-});
-
-
-// UPDATE EMPLOYEE
-app.post('/edit/:id', async (req, res) => {
-    const id = Number(req.params.id);
-    const { name, department, salary } = req.body;
-
-    let employees = await fileHandler.read();
-
-    employees = employees.map(emp => {
-        if (emp.id === id) {
-            return {
-                ...emp,
-                name,
-                department,
-                salary: Number(salary)
-            };
+app.post("/edit/:id", async (req, res) => {
+    const { name, department, salary } = req.body
+    const employees = await fileHandler.read()
+    const index = employees.findIndex(e => e.id == req.params.id)
+    if (index !== -1 && name && department && Number(salary) >= 0) {
+        employees[index] = {
+            ...employees[index],
+            name,
+            department,
+            salary: Number(salary)
         }
-        return emp;
-    });
+    }
+    await fileHandler.write(employees)
+    res.redirect("/")
+})
 
-    await fileHandler.write(employees);
-    res.redirect('/');
-});
-
-app.listen(3000, () => {
-    console.log("Server running at http://localhost:3000");
-});
+app.listen(PORT, async () => {
+    const data = await fileHandler.read()
+    console.log(data)
+})
